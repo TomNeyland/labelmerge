@@ -1,0 +1,88 @@
+[project]
+name = "semdedup"
+version = "0.1.0"
+description = "Semantic deduplication: embed text, find near-duplicates, name groups"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [
+    { name = "Tom Neyland" },
+]
+keywords = ["deduplication", "embeddings", "nlp", "clustering", "entity-resolution"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Processing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+
+dependencies = [
+    "openai>=1.0",
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.5",
+    "typer>=0.12",
+    "rich>=13.0",
+    "diskcache>=5.6",
+]
+
+[project.optional-dependencies]
+litellm = ["litellm>=1.0"]
+local = ["sentence-transformers>=3.0"]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "pytest-cov>=6.0",
+    "pytest-xdist>=3.5",
+    "hypothesis>=6.100",
+    "ruff>=0.15",
+    "pyright>=1.1",
+]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.26",
+]
+
+[project.scripts]
+semdedup = "semdedup.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/TomNeyland/semdedup"
+Documentation = "https://tomneyland.github.io/semdedup"
+Repository = "https://github.com/TomNeyland/semdedup"
+Issues = "https://github.com/TomNeyland/semdedup/issues"
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
+# --- Tool Config ---
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
+"src/semdedup/cli.py" = ["B008"]
+".claude/**" = ["ANN"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "--cov=semdedup --cov-report=term-missing --no-header -q"
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]
