@@ -1,4 +1,4 @@
-# semdedup — Project Kickoff Document
+# labelmerge — Project Kickoff Document
 
 > Working name. Final name TBD. Check PyPI availability before committing.
 > Created: 2026-02-17
@@ -7,7 +7,7 @@
 
 ## What Is This
 
-A standalone Python package for **semantic deduplication of text labels**. Given a corpus of messy free-text values that should be a controlled vocabulary, semdedup embeds them, finds near-duplicates via connected components on a cosine similarity graph, and optionally names the resulting groups.
+A standalone Python package for **semantic deduplication of text labels**. Given a corpus of messy free-text values that should be a controlled vocabulary, labelmerge embeds them, finds near-duplicates via connected components on a cosine similarity graph, and optionally names the resulting groups.
 
 The core insight: this is an **entity resolution** problem, not a clustering problem. The algorithm is SemDeDup (Abbas et al. 2023) simplified: embed, threshold, connected components. One parameter (similarity threshold), deterministic output, no parameter sweeps.
 
@@ -117,7 +117,7 @@ The tool should accept text from multiple sources:
 | **CSV/TSV** | Column name | `--column label` |
 | **Plain text** | One item per line | No extraction needed |
 | **XML** | XPath expression | `--xpath //item/label` |
-| **Stdin pipe** | Stream of lines | `cat labels.txt \| semdedup` |
+| **Stdin pipe** | Stream of lines | `cat labels.txt \| labelmerge` |
 | **Python API** | `list[str]` | Direct |
 
 Priority: JSON/JSONL and plain text first. CSV second. XML if someone asks.
@@ -141,37 +141,37 @@ The **mapping** output is the most useful for downstream consumption: feed it ba
 
 ```bash
 # Basic: deduplicate a text file
-semdedup dedupe labels.txt
+labelmerge dedupe labels.txt
 
 # JSON input with path extraction
-semdedup dedupe data.json --path ".[].label"
+labelmerge dedupe data.json --path ".[].label"
 
 # CSV input
-semdedup dedupe data.csv --column "category"
+labelmerge dedupe data.csv --column "category"
 
 # Tune threshold
-semdedup dedupe labels.txt --threshold 0.90
+labelmerge dedupe labels.txt --threshold 0.90
 
 # Different embedding model
-semdedup dedupe labels.txt --model text-embedding-3-large --dimensions 512
+labelmerge dedupe labels.txt --model text-embedding-3-large --dimensions 512
 
 # Output as mapping (for pipeline integration)
-semdedup dedupe labels.txt --output-format mapping > mapping.json
+labelmerge dedupe labels.txt --output-format mapping > mapping.json
 
 # With LLM naming
-semdedup dedupe labels.txt --name-groups --naming-model gpt-4o-mini
+labelmerge dedupe labels.txt --name-groups --naming-model gpt-4o-mini
 
 # With stop words
-semdedup dedupe labels.txt --stop-words "concentration,level,activity,expression"
+labelmerge dedupe labels.txt --stop-words "concentration,level,activity,expression"
 
 # Sweep thresholds to find the right one
-semdedup sweep labels.txt --thresholds 0.80,0.85,0.90,0.95
+labelmerge sweep labels.txt --thresholds 0.80,0.85,0.90,0.95
 
 # Inspect a specific group
-semdedup inspect groups.json --group 5
+labelmerge inspect groups.json --group 5
 
 # Stats overview
-semdedup stats labels.txt
+labelmerge stats labels.txt
 ```
 
 ### Subcommands
@@ -189,16 +189,16 @@ semdedup stats labels.txt
 ## Python API
 
 ```python
-from semdedup import SemDedup, OpenAIEmbedder
+from labelmerge import LabelMerge, OpenAIEmbedder
 
 # Minimal
-sd = SemDedup()
+sd = LabelMerge()
 result = await sd.dedupe(["foo", "Foo", "FOO", "bar", "baz"])
 # result.groups = [Group(canonical="foo", members=["foo", "Foo", "FOO"])]
 # result.singletons = ["bar", "baz"]
 
 # With config
-sd = SemDedup(
+sd = LabelMerge(
     embedder=OpenAIEmbedder(model="text-embedding-3-small"),
     threshold=0.85,
     max_component_size=50,  # split large components at higher threshold
@@ -240,18 +240,18 @@ Built-in providers:
 - `PrecomputedEmbedder` — wraps a numpy array (no API calls)
 
 Optional extras:
-- `pip install semdedup[litellm]` → `LiteLLMEmbedder` (any provider litellm supports)
-- `pip install semdedup[sentence-transformers]` → `SentenceTransformerEmbedder` (local models, no API)
+- `pip install labelmerge[litellm]` → `LiteLLMEmbedder` (any provider litellm supports)
+- `pip install labelmerge[sentence-transformers]` → `SentenceTransformerEmbedder` (local models, no API)
 
 ---
 
 ## Architecture
 
 ```
-src/semdedup/
-├── __init__.py          # Public API: SemDedup, Group, Result, EmbeddingProvider
+src/labelmerge/
+├── __init__.py          # Public API: LabelMerge, Group, Result, EmbeddingProvider
 ├── py.typed             # PEP 561 marker
-├── core.py              # SemDedup class — orchestrates embed → similarity → components
+├── core.py              # LabelMerge class — orchestrates embed → similarity → components
 ├── similarity.py        # Pairwise cosine similarity (numpy/scipy)
 ├── components.py        # Connected components (scipy.sparse.csgraph)
 ├── blocking.py          # K-means blocking for scale (>50K items)
@@ -269,7 +269,7 @@ src/semdedup/
 │   ├── readers.py       # JSON/JSONL/CSV/text/XML readers
 │   └── writers.py       # JSON/JSONL/CSV/mapping writers
 ├── models.py            # Pydantic models: Group, Result, SweepResult
-├── config.py            # pydantic-settings: SemDedupConfig
+├── config.py            # pydantic-settings: LabelMergeConfig
 ├── cli.py               # Typer CLI app
 └── _stop_words.py       # Stop word stripping utilities
 ```
@@ -280,7 +280,7 @@ src/semdedup/
 
 2. **Async-first** — embedding calls are I/O bound. `asyncio.gather()` for parallel batched embedding. The CLI wraps async with `asyncio.run()`.
 
-3. **Embedding cache** — `diskcache` keyed by `sha256(text + model_name)`. Never re-embed the same text twice. Biggest cost saver. Cache location configurable, defaults to `~/.cache/semdedup/`.
+3. **Embedding cache** — `diskcache` keyed by `sha256(text + model_name)`. Never re-embed the same text twice. Biggest cost saver. Cache location configurable, defaults to `~/.cache/labelmerge/`.
 
 4. **No clustering algorithms** — this is entity resolution, not clustering. Connected components at threshold. No k-means (except for blocking at scale), no agglomerative, no DBSCAN, no Leiden.
 
@@ -350,7 +350,7 @@ class ThresholdStats(BaseModel):
 ```python
 from pydantic_settings import BaseSettings
 
-class SemDedupConfig(BaseSettings):
+class LabelMergeConfig(BaseSettings):
     # Embedding
     openai_api_key: str = ""                    # Falls back to OPENAI_API_KEY env var
     embedding_model: str = "text-embedding-3-small"
@@ -364,13 +364,13 @@ class SemDedupConfig(BaseSettings):
 
     # Cache
     cache_enabled: bool = True
-    cache_dir: str = "~/.cache/semdedup"
+    cache_dir: str = "~/.cache/labelmerge"
 
     # Naming (optional)
     naming_model: str = "gpt-4o-mini"
     naming_temperature: float = 0.0
 
-    model_config = {"env_prefix": "SEMDEDUP_"}
+    model_config = {"env_prefix": "LABELMERGE_"}
 ```
 
 ---
@@ -384,7 +384,7 @@ import diskcache
 class EmbeddingCache:
     """Content-addressed embedding cache. Never re-embed the same text."""
 
-    def __init__(self, cache_dir: str = "~/.cache/semdedup"):
+    def __init__(self, cache_dir: str = "~/.cache/labelmerge"):
         self._cache = diskcache.Cache(os.path.expanduser(cache_dir))
 
     def key(self, text: str, model: str) -> str:
@@ -497,7 +497,7 @@ def find_groups_blocked(embeddings: np.ndarray, threshold: float, n_blocks: int 
 | Changelog | **git-cliff** | Auto-generate from conventional commits |
 | Versioning | **python-semantic-release** | Auto-bump from commit messages |
 | License | **MIT** | Simple, permissive, universal |
-| Layout | **src/semdedup/** | Avoids accidental imports from working directory |
+| Layout | **src/labelmerge/** | Avoids accidental imports from working directory |
 
 ---
 
@@ -505,7 +505,7 @@ def find_groups_blocked(embeddings: np.ndarray, threshold: float, n_blocks: int 
 
 ```toml
 [project]
-name = "semdedup"  # TBD — check PyPI availability
+name = "labelmerge"  # TBD — check PyPI availability
 version = "0.1.0"
 description = "Semantic deduplication: embed text, find near-duplicates, name groups"
 readme = "README.md"
@@ -555,13 +555,13 @@ docs = [
 ]
 
 [project.scripts]
-semdedup = "semdedup.cli:app"
+labelmerge = "labelmerge.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/TomNeyland/semdedup"
-Documentation = "https://tomneyland.github.io/semdedup"
-Repository = "https://github.com/TomNeyland/semdedup"
-Issues = "https://github.com/TomNeyland/semdedup/issues"
+Homepage = "https://github.com/TomNeyland/labelmerge"
+Documentation = "https://tomneyland.github.io/labelmerge"
+Repository = "https://github.com/TomNeyland/labelmerge"
+Issues = "https://github.com/TomNeyland/labelmerge/issues"
 
 [build-system]
 requires = ["uv_build"]
@@ -585,7 +585,7 @@ typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-addopts = "--cov=semdedup --cov-report=term-missing"
+addopts = "--cov=labelmerge --cov-report=term-missing"
 
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]
@@ -662,7 +662,7 @@ repos:
 
 ```
 tests/
-├── test_core.py           # SemDedup orchestration
+├── test_core.py           # LabelMerge orchestration
 ├── test_similarity.py     # Pairwise similarity math
 ├── test_components.py     # Connected components correctness
 ├── test_blocking.py       # K-means blocking for scale
@@ -709,7 +709,7 @@ def test_mapping_is_complete():
 
 ### Integration Tests
 
-- Real OpenAI API calls (gated behind `SEMDEDUP_INTEGRATION_TESTS=1` env var)
+- Real OpenAI API calls (gated behind `LABELMERGE_INTEGRATION_TESTS=1` env var)
 - Round-trip: text file → CLI dedupe → mapping → verify mapping is valid
 - Cache: first run calls API, second run hits cache (zero API calls)
 
@@ -789,7 +789,7 @@ These validate the approach and inform threshold selection:
 
 ## Open Questions
 
-1. **Package name** — `semdedup`? `textdedup`? `vocabforge`? `termfold`? Check PyPI availability.
+1. **Package name** — `labelmerge`? `textdedup`? `vocabforge`? `termfold`? Check PyPI availability.
 2. **Naming LLM** — which model for group naming? gpt-4o-mini is cheap and good enough. Should it be configurable or hardcoded?
 3. **Threshold default** — 0.85 worked well for biomedical text. Is it universal? Need testing across domains.
 4. **Embedding model default** — `text-embedding-3-small` (cheap, fast) vs `text-embedding-3-large` (better quality). Small is probably fine for dedup.

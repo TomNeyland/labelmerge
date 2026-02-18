@@ -1,8 +1,8 @@
-# semdedup
+# LabelMerge
 
-Semantic deduplication of text labels via connected components on a cosine similarity graph. One parameter (threshold), deterministic output. Entity resolution, not clustering.
+Merge semantically equivalent text labels into a controlled vocabulary via connected components on a cosine similarity graph. One parameter (threshold), deterministic output. Entity resolution, not clustering.
 
-**Origin:** @semdedup-kickoff.md has the full spec, algorithm details, and design decisions.
+**Origin:** @labelmerge-kickoff.md has the full spec, algorithm details, and design decisions.
 
 ## This Repo Is 100% AI-Built
 
@@ -32,15 +32,15 @@ uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run 
 ## Architecture
 
 ```
-src/semdedup/
-  __init__.py          Public API: SemDedup, Group, Member, Result, EmbeddingProvider
+src/labelmerge/
+  __init__.py          Public API: LabelMerge, Group, Member, Result, EmbeddingProvider
   py.typed             PEP 561 marker
-  core.py              SemDedup class — orchestrates embed → similarity → components
+  core.py              LabelMerge class — orchestrates embed → similarity → components
   similarity.py        build_similarity_graph() — pairwise cosine (numpy dot product on L2-normed vectors)
   components.py        find_groups() — connected components via scipy.sparse.csgraph
   blocking.py          find_groups_blocked() — K-means blocking for >50K items
   models.py            Pydantic: Member, Group, Result, SweepResult, ThresholdStats
-  config.py            SemDedupConfig (pydantic-settings, env prefix SEMDEDUP_)
+  config.py            LabelMergeConfig (pydantic-settings, env prefix LABELMERGE_)
   cache.py             EmbeddingCache — diskcache keyed by sha256(model:text)
   naming.py            LLM-based group naming (optional, async)
   _stop_words.py       Stop word stripping (before embed, preserved in output)
@@ -49,8 +49,8 @@ src/semdedup/
     protocol.py        EmbeddingProvider Protocol
     openai.py          OpenAIEmbedder (default, async, batched, cached)
     precomputed.py     PrecomputedEmbedder (wraps numpy array, no API)
-    litellm.py         LiteLLMEmbedder (optional extra: semdedup[litellm])
-    sentence.py        SentenceTransformerEmbedder (optional extra: semdedup[local])
+    litellm.py         LiteLLMEmbedder (optional extra: labelmerge[litellm])
+    sentence.py        SentenceTransformerEmbedder (optional extra: labelmerge[local])
   io/
     readers.py         read_json, read_jsonl, read_csv, read_text
     writers.py         write_json, write_jsonl, write_csv, write_mapping
@@ -83,7 +83,7 @@ src/semdedup/
 - pytest + pytest-asyncio (asyncio_mode = "auto")
 - hypothesis for property-based graph invariant tests
 - Mock OpenAI in unit tests — never call real APIs
-- Integration tests gated: `SEMDEDUP_INTEGRATION_TESTS=1`
+- Integration tests gated: `LABELMERGE_INTEGRATION_TESTS=1`
 - File naming mirrors source: `core.py` → `test_core.py`
 
 ## Git Workflow

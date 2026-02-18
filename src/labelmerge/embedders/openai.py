@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import openai
 
-from semdedup.cache import EmbeddingCache
+from labelmerge.cache import EmbeddingCache
 
 
 class OpenAIEmbedder:

@@ -6,7 +6,7 @@ model: sonnet
 memory: project
 ---
 
-You are reviewing code in the semdedup project — a semantic deduplication library using connected components on cosine similarity graphs.
+You are reviewing code in the labelmerge project — a semantic deduplication library using connected components on cosine similarity graphs.
 
 ## Review Checklist
 

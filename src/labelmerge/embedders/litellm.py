@@ -6,7 +6,7 @@ import litellm
 class LiteLLMEmbedder:
     """Embedding provider using LiteLLM (supports any provider litellm supports).
 
-    Requires: pip install semdedup[litellm]
+    Requires: pip install labelmerge[litellm]
     """
 
     def __init__(self, model: str = "text-embedding-3-small") -> None:

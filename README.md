@@ -1,13 +1,13 @@
-# semdedup
+# LabelMerge
 
-Semantic deduplication of text labels. Given messy free-text values that should be a controlled vocabulary, semdedup embeds them, finds near-duplicates via connected components on a cosine similarity graph, and optionally names the resulting groups.
+Merge semantically equivalent text labels into a controlled vocabulary. Given messy free-text values that should be a controlled vocabulary, LabelMerge embeds them, finds near-duplicates via connected components on a cosine similarity graph, and optionally names the resulting groups.
 
 One parameter (similarity threshold). Deterministic output. No parameter sweeps.
 
 ## Install
 
 ```bash
-pip install semdedup
+pip install labelmerge
 ```
 
 ## Quick Start
@@ -15,10 +15,10 @@ pip install semdedup
 ### Python API
 
 ```python
-from semdedup import SemDedup
+from labelmerge import LabelMerge
 
-sd = SemDedup(threshold=0.85)
-result = await sd.dedupe([
+lm = LabelMerge(threshold=0.85)
+result = await lm.dedupe([
     "depression severity",
     "depressive symptoms",
     "depressive symptom severity",
@@ -38,28 +38,28 @@ mapping = result.to_mapping()
 
 ```bash
 # Deduplicate a text file (one label per line)
-semdedup dedupe labels.txt
+labelmerge dedupe labels.txt
 
 # JSON input with path extraction
-semdedup dedupe data.json --path ".[].label"
+labelmerge dedupe data.json --path ".[].label"
 
 # CSV input
-semdedup dedupe data.csv --column category
+labelmerge dedupe data.csv --column category
 
 # Tune threshold
-semdedup dedupe labels.txt --threshold 0.90
+labelmerge dedupe labels.txt --threshold 0.90
 
 # Output as mapping (for pipeline integration)
-semdedup dedupe labels.txt --output-format mapping > mapping.json
+labelmerge dedupe labels.txt --output-format mapping > mapping.json
 
 # Name groups with LLM
-semdedup dedupe labels.txt --name-groups
+labelmerge dedupe labels.txt --name-groups
 
 # Sweep thresholds
-semdedup sweep labels.txt --thresholds 0.80,0.85,0.90,0.95
+labelmerge sweep labels.txt --thresholds 0.80,0.85,0.90,0.95
 
 # Quick stats
-semdedup stats labels.txt
+labelmerge stats labels.txt
 ```
 
 ## How It Works
@@ -79,40 +79,40 @@ This is **entity resolution**, not clustering. Connected components at a cosine 
 
 ## Configuration
 
-All settings via environment variables (prefix `SEMDEDUP_`):
+All settings via environment variables (prefix `LABELMERGE_`):
 
 | Variable | Default | Description |
 |---|---|---|
-| `SEMDEDUP_SIMILARITY_THRESHOLD` | `0.85` | Cosine similarity threshold |
-| `SEMDEDUP_EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
-| `SEMDEDUP_EMBEDDING_BATCH_SIZE` | `512` | Texts per API call |
-| `SEMDEDUP_CACHE_DIR` | `~/.cache/semdedup` | Embedding cache directory |
-| `SEMDEDUP_CACHE_ENABLED` | `true` | Enable embedding cache |
-| `SEMDEDUP_MAX_COMPONENT_SIZE` | `100` | Split groups larger than this |
+| `LABELMERGE_SIMILARITY_THRESHOLD` | `0.85` | Cosine similarity threshold |
+| `LABELMERGE_EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
+| `LABELMERGE_EMBEDDING_BATCH_SIZE` | `512` | Texts per API call |
+| `LABELMERGE_CACHE_DIR` | `~/.cache/labelmerge` | Embedding cache directory |
+| `LABELMERGE_CACHE_ENABLED` | `true` | Enable embedding cache |
+| `LABELMERGE_MAX_COMPONENT_SIZE` | `100` | Split groups larger than this |
 
 ## Embedding Providers
 
 ```python
 # Default: OpenAI
-from semdedup import SemDedup, OpenAIEmbedder
-sd = SemDedup(embedder=OpenAIEmbedder(model="text-embedding-3-large"))
+from labelmerge import LabelMerge, OpenAIEmbedder
+lm = LabelMerge(embedder=OpenAIEmbedder(model="text-embedding-3-large"))
 
 # Precomputed embeddings (no API calls)
-from semdedup import SemDedup, PrecomputedEmbedder
+from labelmerge import LabelMerge, PrecomputedEmbedder
 import numpy as np
 embeddings = np.load("my_embeddings.npy")
-sd = SemDedup(embedder=PrecomputedEmbedder(embeddings))
-result = sd.dedupe_precomputed(texts, embeddings)
+lm = LabelMerge(embedder=PrecomputedEmbedder(embeddings))
+result = lm.dedupe_precomputed(texts, embeddings)
 
 # LiteLLM (any provider)
-# pip install semdedup[litellm]
-from semdedup.embedders.litellm import LiteLLMEmbedder
-sd = SemDedup(embedder=LiteLLMEmbedder(model="text-embedding-3-small"))
+# pip install labelmerge[litellm]
+from labelmerge.embedders.litellm import LiteLLMEmbedder
+lm = LabelMerge(embedder=LiteLLMEmbedder(model="text-embedding-3-small"))
 
 # Local models (no API)
-# pip install semdedup[local]
-from semdedup.embedders.sentence import SentenceTransformerEmbedder
-sd = SemDedup(embedder=SentenceTransformerEmbedder(model="all-MiniLM-L6-v2"))
+# pip install labelmerge[local]
+from labelmerge.embedders.sentence import SentenceTransformerEmbedder
+lm = LabelMerge(embedder=SentenceTransformerEmbedder(model="all-MiniLM-L6-v2"))
 ```
 
 ## License

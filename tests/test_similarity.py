@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from semdedup.components import find_groups
-from semdedup.similarity import build_similarity_graph
+from labelmerge.components import find_groups
+from labelmerge.similarity import build_similarity_graph
 
 
 def test_build_similarity_graph_identical_vectors():
@@ -25,12 +25,15 @@ def test_build_similarity_graph_no_self_loops():
 
 def test_find_groups_basic():
     # Three identical vectors and one orthogonal
-    embeddings = np.array([
-        [1.0, 0.0],
-        [1.0, 0.0],
-        [1.0, 0.0],
-        [0.0, 1.0],
-    ], dtype=np.float64)
+    embeddings = np.array(
+        [
+            [1.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 0.0],
+            [0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
     groups = find_groups(embeddings, threshold=0.9)
     assert len(groups) == 1
     assert sorted(groups[0]) == [0, 1, 2]

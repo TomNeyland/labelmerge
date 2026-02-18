@@ -9,12 +9,12 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from semdedup.config import SemDedupConfig
-from semdedup.core import SemDedup
-from semdedup.io.writers import write_csv, write_json, write_jsonl, write_mapping
-from semdedup.models import Result
+from labelmerge.config import LabelMergeConfig
+from labelmerge.core import LabelMerge
+from labelmerge.io.writers import write_csv, write_json, write_jsonl, write_mapping
+from labelmerge.models import Result
 
-app = typer.Typer(name="semdedup", help="Semantic deduplication of text labels.")
+app = typer.Typer(name="labelmerge", help="Semantic deduplication of text labels.")
 cache_app = typer.Typer(name="cache", help="Manage embedding cache.")
 app.add_typer(cache_app)
 
@@ -37,10 +37,10 @@ def dedupe(
     max_component_size: int = typer.Option(100, help="Max component size before splitting."),
 ) -> None:
     """Deduplicate text labels from a file."""
-    from semdedup.cache import EmbeddingCache
-    from semdedup.embedders.openai import OpenAIEmbedder
+    from labelmerge.cache import EmbeddingCache
+    from labelmerge.embedders.openai import OpenAIEmbedder
 
-    config = SemDedupConfig()
+    config = LabelMergeConfig()
     cache = EmbeddingCache(config.cache_dir) if config.cache_enabled else None
     embedder = OpenAIEmbedder(
         model=model,
@@ -51,7 +51,7 @@ def dedupe(
 
     sw_list = [s.strip() for s in stop_words.split(",")] if stop_words else []
 
-    sd = SemDedup(
+    sd = LabelMerge(
         embedder=embedder,
         threshold=threshold,
         max_component_size=max_component_size,
@@ -76,10 +76,10 @@ def sweep(
     model: str = typer.Option("text-embedding-3-small", help="Embedding model."),
 ) -> None:
     """Run dedup at multiple thresholds to find the right one."""
-    from semdedup.cache import EmbeddingCache
-    from semdedup.embedders.openai import OpenAIEmbedder
+    from labelmerge.cache import EmbeddingCache
+    from labelmerge.embedders.openai import OpenAIEmbedder
 
-    config = SemDedupConfig()
+    config = LabelMergeConfig()
     cache = EmbeddingCache(config.cache_dir) if config.cache_enabled else None
     embedder = OpenAIEmbedder(model=model, cache=cache)
 
@@ -93,7 +93,7 @@ def sweep(
     table.add_column("% Grouped", justify="right")
 
     for t in threshold_list:
-        sd = SemDedup(embedder=embedder, threshold=t, cache_enabled=False)
+        sd = LabelMerge(embedder=embedder, threshold=t, cache_enabled=False)
         result = asyncio.run(sd.dedupe_file(input_file, path_expr=path, column=column))
         max_size = max((g.size for g in result.groups), default=0)
         pct = (result.n_grouped / result.n_input * 100) if result.n_input > 0 else 0.0
@@ -115,7 +115,7 @@ def stats(
     column: str | None = typer.Option(None, help="Column name for CSV."),
 ) -> None:
     """Quick stats about input data."""
-    from semdedup.io.readers import read_csv, read_json, read_jsonl, read_text
+    from labelmerge.io.readers import read_csv, read_json, read_jsonl, read_text
 
     suffix = input_file.suffix.lower()
     if suffix == ".json" and path is not None:
@@ -169,9 +169,9 @@ def inspect(
 @cache_app.command("clear")
 def cache_clear() -> None:
     """Clear the embedding cache."""
-    from semdedup.cache import EmbeddingCache
+    from labelmerge.cache import EmbeddingCache
 
-    config = SemDedupConfig()
+    config = LabelMergeConfig()
     cache = EmbeddingCache(config.cache_dir)
     cache.clear()
     console.print("Cache cleared.")
@@ -180,9 +180,9 @@ def cache_clear() -> None:
 @cache_app.command("stats")
 def cache_stats() -> None:
     """Show embedding cache statistics."""
-    from semdedup.cache import EmbeddingCache
+    from labelmerge.cache import EmbeddingCache
 
-    config = SemDedupConfig()
+    config = LabelMergeConfig()
     cache = EmbeddingCache(config.cache_dir)
     s = cache.stats()
     console.print(f"Cached embeddings: {s['size']}")

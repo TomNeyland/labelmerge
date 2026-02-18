@@ -3,8 +3,8 @@ from __future__ import annotations
 from pydantic_settings import BaseSettings
 
 
-class SemDedupConfig(BaseSettings):
-    """Configuration for semdedup, loaded from environment variables."""
+class LabelMergeConfig(BaseSettings):
+    """Configuration for labelmerge, loaded from environment variables."""
 
     # Embedding
     openai_api_key: str = ""
@@ -19,10 +19,10 @@ class SemDedupConfig(BaseSettings):
 
     # Cache
     cache_enabled: bool = True
-    cache_dir: str = "~/.cache/semdedup"
+    cache_dir: str = "~/.cache/labelmerge"
 
     # Naming (optional)
     naming_model: str = "gpt-4o-mini"
     naming_temperature: float = 0.0
 
-    model_config = {"env_prefix": "SEMDEDUP_"}
+    model_config = {"env_prefix": "LABELMERGE_"}

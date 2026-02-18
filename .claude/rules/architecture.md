@@ -1,6 +1,6 @@
 ---
 paths:
-  - "src/semdedup/**/*.py"
+  - "src/labelmerge/**/*.py"
 ---
 
 # Module Boundaries
@@ -10,7 +10,7 @@ Each module has a single responsibility. Do not leak abstractions across boundar
 - **similarity.py** — Builds the sparse similarity matrix. Only numpy/scipy. No business logic.
 - **components.py** — Extracts connected components from a similarity graph. Uses similarity.py's output. Returns index lists.
 - **core.py** — Orchestrator. Imports from components, embedders, cache, naming. The only module that knows about the full pipeline.
-- **models.py** — Pydantic data models only. No business logic, no I/O, no imports from other semdedup modules.
+- **models.py** — Pydantic data models only. No business logic, no I/O, no imports from other labelmerge modules.
 - **config.py** — pydantic-settings config only. No logic.
 - **cache.py** — Embedding cache. No knowledge of what's being cached or why.
 - **naming.py** — LLM naming. Takes groups, returns named groups. No knowledge of how groups were formed.

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from semdedup.io.readers import read_csv, read_json, read_jsonl, read_text
-from semdedup.io.writers import write_csv, write_json, write_jsonl, write_mapping
+from labelmerge.io.readers import read_csv, read_json, read_jsonl, read_text
+from labelmerge.io.writers import write_csv, write_json, write_jsonl, write_mapping
 
 __all__ = [
     "read_csv",
