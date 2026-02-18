@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from semdedup.components import find_groups
-from semdedup.similarity import build_similarity_graph
+from labelmerge.components import find_groups
+from labelmerge.similarity import build_similarity_graph
 
 
 def test_build_similarity_graph_identical_vectors():

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from semdedup.models import Group, Member, Result
+from labelmerge.models import Group, Member, Result
 
 
 def test_result_to_mapping() -> None:

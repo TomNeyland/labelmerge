@@ -9,7 +9,7 @@ import diskcache
 class EmbeddingCache:
     """Content-addressed embedding cache. Never re-embed the same text."""
 
-    def __init__(self, cache_dir: str = "~/.cache/semdedup") -> None:
+    def __init__(self, cache_dir: str = "~/.cache/labelmerge") -> None:
         self._cache: diskcache.Cache = diskcache.Cache(os.path.expanduser(cache_dir))
 
     def key(self, text: str, model: str) -> str:

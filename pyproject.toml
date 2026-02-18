@@ -1,14 +1,14 @@
 [project]
-name = "semdedup"
+name = "labelmerge"
 version = "0.1.0"
-description = "Semantic deduplication: embed text, find near-duplicates, name groups"
+description = "LabelMerge: group semantically equivalent text labels into a controlled vocabulary"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 authors = [
     { name = "Tom Neyland" },
 ]
-keywords = ["deduplication", "embeddings", "nlp", "clustering", "entity-resolution"]
+keywords = ["deduplication", "embeddings", "nlp", "clustering", "entity-resolution", "label-merging"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -49,13 +49,13 @@ docs = [
 ]
 
 [project.scripts]
-semdedup = "semdedup.cli:app"
+labelmerge = "labelmerge.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/TomNeyland/semdedup"
-Documentation = "https://tomneyland.github.io/semdedup"
-Repository = "https://github.com/TomNeyland/semdedup"
-Issues = "https://github.com/TomNeyland/semdedup/issues"
+Homepage = "https://github.com/TomNeyland/LabelMerge"
+Documentation = "https://tomneyland.github.io/LabelMerge"
+Repository = "https://github.com/TomNeyland/LabelMerge"
+Issues = "https://github.com/TomNeyland/LabelMerge/issues"
 
 [build-system]
 requires = ["uv_build"]
@@ -72,7 +72,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN"]
-"src/semdedup/cli.py" = ["B008"]
+"src/labelmerge/cli.py" = ["B008"]
 ".claude/**" = ["ANN"]
 
 [tool.pyright]
@@ -82,7 +82,7 @@ reportMissingTypeStubs = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-addopts = "--cov=semdedup --cov-report=term-missing --no-header -q"
+addopts = "--cov=labelmerge --cov-report=term-missing --no-header -q"
 
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]

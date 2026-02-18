@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import openai
 
-from semdedup.models import Group
+from labelmerge.models import Group
 
 
 async def name_groups(

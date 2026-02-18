@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from semdedup.similarity import build_similarity_graph
+from labelmerge.similarity import build_similarity_graph
 
 
 def find_groups(embeddings: np.ndarray, threshold: float) -> list[list[int]]:

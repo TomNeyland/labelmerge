@@ -5,16 +5,16 @@ from pathlib import Path
 
 import numpy as np
 
-from semdedup._stop_words import strip_stop_words
-from semdedup.cache import EmbeddingCache
-from semdedup.components import find_groups
-from semdedup.embedders.openai import OpenAIEmbedder
-from semdedup.embedders.protocol import EmbeddingProvider
-from semdedup.models import Group, Member, Result
-from semdedup.naming import name_groups
+from labelmerge._stop_words import strip_stop_words
+from labelmerge.cache import EmbeddingCache
+from labelmerge.components import find_groups
+from labelmerge.embedders.openai import OpenAIEmbedder
+from labelmerge.embedders.protocol import EmbeddingProvider
+from labelmerge.models import Group, Member, Result
+from labelmerge.naming import name_groups
 
 
-class SemDedup:
+class LabelMerge:
     """Semantic deduplication: embed text, find near-duplicates, name groups."""
 
     def __init__(
@@ -24,7 +24,7 @@ class SemDedup:
         max_component_size: int = 100,
         overflow_threshold_bump: float = 0.05,
         stop_words: list[str] | None = None,
-        cache_dir: str = "~/.cache/semdedup",
+        cache_dir: str = "~/.cache/labelmerge",
         cache_enabled: bool = True,
     ) -> None:
         self.threshold = threshold
@@ -89,7 +89,7 @@ class SemDedup:
 
         Supports JSON, JSONL, CSV, and plain text.
         """
-        from semdedup.io.readers import read_csv, read_json, read_jsonl, read_text
+        from labelmerge.io.readers import read_csv, read_json, read_jsonl, read_text
 
         file_path = Path(path)
         suffix = file_path.suffix.lower()

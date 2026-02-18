@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from semdedup.components import find_groups
+from labelmerge.components import find_groups
 
 
 def find_groups_blocked(

@@ -6,7 +6,7 @@ from sentence_transformers import SentenceTransformer
 class SentenceTransformerEmbedder:
     """Embedding provider using sentence-transformers (local models, no API).
 
-    Requires: pip install semdedup[local]
+    Requires: pip install labelmerge[local]
     """
 
     def __init__(self, model: str = "all-MiniLM-L6-v2") -> None:

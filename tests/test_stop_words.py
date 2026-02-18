@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from semdedup._stop_words import strip_stop_words
+from labelmerge._stop_words import strip_stop_words
 
 
 def test_strip_basic():

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from semdedup.models import Result
+    from labelmerge.models import Result
 
 
 def write_json(result: Result, path: str | Path) -> None:
