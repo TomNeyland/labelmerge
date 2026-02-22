@@ -111,7 +111,19 @@ class LabelMerge:
     ) -> Result:
         """Name all groups in a result using an LLM."""
         named = await name_groups(result.groups, model=model, temperature=temperature)
-        return result.model_copy(update={"groups": named})
+        # Review may split groups; rebuild group IDs and summary counts.
+        reindexed_groups = [
+            group.model_copy(update={"group_id": group_id}) for group_id, group in enumerate(named)
+        ]
+        n_grouped = sum(group.size for group in reindexed_groups if group.size > 1)
+        reviewed_singletons = sum(1 for group in reindexed_groups if group.size == 1)
+        return result.model_copy(
+            update={
+                "groups": reindexed_groups,
+                "n_grouped": n_grouped,
+                "n_singletons": len(result.singletons) + reviewed_singletons,
+            }
+        )
 
     def _build_result(
         self,

@@ -303,6 +303,7 @@ def _print_dedupe_summary(
     if quiet:
         return
 
+    merge_groups = [group for group in result.groups if group.size > 1]
     canonical_count = len(result.canonical_values())
     reduction_pct = 0.0
     if unique_values > 0:
@@ -320,15 +321,15 @@ def _print_dedupe_summary(
         quiet=quiet,
     )
 
-    if result.groups:
-        largest = max(result.groups, key=lambda g: (g.size, g.total_occurrences))
+    if merge_groups:
+        largest = max(merge_groups, key=lambda g: (g.size, g.total_occurrences))
         largest_canonical = largest.canonical or largest.members[0].text
         _stderr(
             f'Largest merge: {largest.size} variants → "{largest_canonical}"',
             quiet=quiet,
         )
         _stderr("Top merges:", quiet=quiet)
-        for group in result.groups[:3]:
+        for group in merge_groups[:3]:
             canonical = group.canonical or group.members[0].text
             variants = [m.text for m in group.members if m.text != canonical][:4]
             if not variants:
@@ -351,6 +352,7 @@ def _print_corpus_summary(
     total_values = len(read_result.texts)
     unique_values = len(counts)
     exact_singletons = sum(1 for c in counts.values() if c == 1)
+    merge_groups = [group for group in result.groups if group.size > 1]
     canonical_count = len(result.canonical_values())
     merged_values = max(unique_values - canonical_count, 0)
     reduction_pct = ((merged_values / unique_values) * 100.0) if unique_values else 0.0
@@ -368,12 +370,12 @@ def _print_corpus_summary(
         quiet=quiet,
     )
     _stderr(
-        f"  {merged_values} values merged into {len(result.groups)} groups",
+        f"  {merged_values} values merged into {len(merge_groups)} groups",
         quiet=quiet,
     )
 
-    if result.groups:
-        largest = max(result.groups, key=lambda g: (g.size, g.total_occurrences))
+    if merge_groups:
+        largest = max(merge_groups, key=lambda g: (g.size, g.total_occurrences))
         largest_canonical = largest.canonical or largest.members[0].text
         _stderr(
             (
@@ -385,7 +387,7 @@ def _print_corpus_summary(
         _stderr("", quiet=quiet)
         _stderr("Top merges:", quiet=quiet)
         for group in sorted(
-            result.groups, key=lambda g: (g.total_occurrences, g.size, -(g.group_id)), reverse=True
+            merge_groups, key=lambda g: (g.total_occurrences, g.size, -(g.group_id)), reverse=True
         )[:5]:
             canonical = group.canonical or group.members[0].text
             variants = [m.text for m in group.members if m.text != canonical][:4]
@@ -1174,19 +1176,35 @@ def apply(
 
 @app.command()
 def sweep(
-    input_file: Path,
+    inputs: list[str] = typer.Argument(None, help="Input file(s), glob(s), or '-' for stdin."),
+    stdin: bool = typer.Option(False, "--stdin", help="Read input values from stdin."),
+    input_format: str = typer.Option(
+        "auto",
+        help="Input format: auto, text, json, jsonl, csv (stdin: text/json).",
+    ),
     thresholds: str = typer.Option("0.80,0.85,0.90,0.95", help="Comma-separated thresholds."),
     path: str | None = typer.Option(None, help="jq-style path for JSON/JSONL."),
     column: str | None = typer.Option(None, help="Column name for CSV."),
     model: str = typer.Option("text-embedding-3-small", help="Embedding model."),
+    dimensions: int | None = typer.Option(None, help="Embedding dimensions."),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress scan progress to stderr."),
 ) -> None:
     """Run dedup at multiple thresholds to find the right one."""
     from labelmerge.cache import EmbeddingCache
     from labelmerge.embedders.openai import OpenAIEmbedder
 
+    read_result = _read_inputs(
+        inputs=inputs,
+        stdin_flag=stdin,
+        input_format=input_format,
+        path_expr=path,
+        column=column,
+        quiet=quiet,
+    )
+
     config = LabelMergeConfig()
     cache = EmbeddingCache(config.cache_dir) if config.cache_enabled else None
-    embedder = OpenAIEmbedder(model=model, cache=cache)
+    embedder = OpenAIEmbedder(model=model, dimensions=dimensions, cache=cache)
 
     threshold_list = [float(t.strip()) for t in thresholds.split(",")]
 
@@ -1199,7 +1217,7 @@ def sweep(
 
     for t in threshold_list:
         sd = LabelMerge(embedder=embedder, threshold=t, cache_enabled=False)
-        result = asyncio.run(sd.dedupe_file(input_file, path_expr=path, column=column))
+        result = asyncio.run(sd.dedupe(read_result.texts))
         max_size = max((g.size for g in result.groups), default=0)
         pct = (result.n_grouped / result.n_input * 100) if result.n_input > 0 else 0.0
         table.add_row(
