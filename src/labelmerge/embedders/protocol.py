@@ -7,7 +7,7 @@ from typing import Protocol, runtime_checkable
 class EmbeddingProvider(Protocol):
     """Protocol for embedding providers.
 
-    Any class implementing this protocol can be used with SemDedup.
+    Any class implementing this protocol can be used with LabelMerge.
     """
 
     async def embed(self, texts: list[str]) -> list[list[float]]:

@@ -49,6 +49,16 @@ class LabelMerge:
         # Deduplicate input and count occurrences
         counts = Counter(texts)
         unique_texts = list(counts.keys())
+        if not unique_texts:
+            return Result(
+                groups=[],
+                singletons=[],
+                threshold=self.threshold,
+                model=self._model_name,
+                n_input=0,
+                n_grouped=0,
+                n_singletons=0,
+            )
 
         # Prepare texts for embedding (strip stop words if configured)
         if self.stop_words:
@@ -84,24 +94,15 @@ class LabelMerge:
         path: str | Path,
         path_expr: str | None = None,
         column: str | None = None,
+        input_format: str | None = None,
     ) -> Result:
         """Deduplicate texts from a file.
 
         Supports JSON, JSONL, CSV, and plain text.
         """
-        from labelmerge.io.readers import read_csv, read_json, read_jsonl, read_text
+        from labelmerge.io.readers import read_values
 
-        file_path = Path(path)
-        suffix = file_path.suffix.lower()
-
-        if suffix == ".json" and path_expr is not None:
-            texts = read_json(file_path, path_expr)
-        elif suffix == ".jsonl" and path_expr is not None:
-            texts = read_jsonl(file_path, path_expr)
-        elif suffix == ".csv" and column is not None:
-            texts = read_csv(file_path, column)
-        else:
-            texts = read_text(file_path)
+        texts = read_values(path, path_expr=path_expr, column=column, input_format=input_format)
 
         return await self.dedupe(texts)
 
