@@ -5,11 +5,14 @@ import pytest
 from labelmerge.core import LabelMerge
 from labelmerge.models import Group, Member, Result
 from labelmerge.naming import (
+    GenericReviewPolicy,
     _ReviewDecision,
     _ReviewedSubgroup,
     _apply_review_decision,
     _is_suspicious_group,
     _parse_split_subgroups,
+    load_review_policy,
+    load_review_rules,
 )
 
 
@@ -23,9 +26,46 @@ def _make_group(*texts: tuple[str, int], group_id: int = 0) -> Group:
     )
 
 
+class _AlwaysSafePolicy:
+    def is_suspicious_group(self, group: Group) -> bool:
+        return False
+
+    def build_batch_prompt(self, batch, *, allow_split: bool) -> str:
+        return "[]"
+
+
+def _make_test_policy() -> _AlwaysSafePolicy:
+    return _AlwaysSafePolicy()
+
+
 def test_is_suspicious_group_detects_left_right() -> None:
     group = _make_group(("grip strength (left)", 3), ("grip strength (right)", 2))
     assert _is_suspicious_group(group) is True
+
+
+def test_load_review_rules_customizes_antonym_pairs(tmp_path) -> None:
+    rules_file = tmp_path / "review_rules.json"
+    rules_file.write_text(
+        """
+        {
+          "antonym_pairs": [["inbound", "outbound"]],
+          "regex_conflicts": [],
+          "enable_subtype_suffix_check": false,
+          "enable_parenthetical_qualifier_check": false
+        }
+        """
+    )
+    rules = load_review_rules(rules_file)
+    policy = GenericReviewPolicy(rules)
+    group = _make_group(("shipment route inbound", 2), ("shipment route outbound", 2))
+
+    assert policy.is_suspicious_group(group) is True
+
+
+def test_load_review_policy_supports_plugin_factory() -> None:
+    policy = load_review_policy(review_policy="tests.test_naming:_make_test_policy")
+
+    assert isinstance(policy, _AlwaysSafePolicy)
 
 
 def test_parse_split_subgroups_requires_exact_partition() -> None:

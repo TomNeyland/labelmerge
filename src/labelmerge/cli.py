@@ -467,6 +467,9 @@ async def _run_dedupe_async(
     max_component_size: int,
     name_groups: bool,
     naming_model: str,
+    review_profile: str,
+    review_rules: Path | None,
+    review_policy: str | None,
     quiet: bool,
 ) -> _DedupeRunOutcome:
     unique_count = len(set(texts))
@@ -490,7 +493,16 @@ async def _run_dedupe_async(
         embed_progress.finish()
 
     if name_groups:
-        result = await lm.name_groups(result, model=naming_model)
+        try:
+            result = await lm.name_groups(
+                result,
+                model=naming_model,
+                review_profile=review_profile,
+                review_rules_path=review_rules,
+                review_policy=review_policy,
+            )
+        except (ImportError, AttributeError, ValueError) as exc:
+            raise typer.BadParameter(str(exc)) from exc
     return _DedupeRunOutcome(result=result, embed=_coerce_embed_run_stats(embedder))
 
 
@@ -504,6 +516,9 @@ def _run_dedupe_with_metrics(
     max_component_size: int,
     name_groups: bool,
     naming_model: str,
+    review_profile: str,
+    review_rules: Path | None,
+    review_policy: str | None,
     quiet: bool,
 ) -> _DedupeRunOutcome:
     return asyncio.run(
@@ -516,6 +531,9 @@ def _run_dedupe_with_metrics(
             max_component_size=max_component_size,
             name_groups=name_groups,
             naming_model=naming_model,
+            review_profile=review_profile,
+            review_rules=review_rules,
+            review_policy=review_policy,
             quiet=quiet,
         )
     )
@@ -531,6 +549,9 @@ def _run_dedupe(
     max_component_size: int,
     name_groups: bool,
     naming_model: str,
+    review_profile: str,
+    review_rules: Path | None,
+    review_policy: str | None,
     quiet: bool,
 ) -> Result:
     return _run_dedupe_with_metrics(
@@ -542,6 +563,9 @@ def _run_dedupe(
         max_component_size=max_component_size,
         name_groups=name_groups,
         naming_model=naming_model,
+        review_profile=review_profile,
+        review_rules=review_rules,
+        review_policy=review_policy,
         quiet=quiet,
     ).result
 
@@ -951,6 +975,18 @@ def dedupe(
     stop_words: str | None = typer.Option(None, help="Comma-separated stop words."),
     name_groups: bool = typer.Option(False, "--name-groups", help="Name groups with LLM."),
     naming_model: str = typer.Option("gpt-4o-mini", help="Model for group naming."),
+    review_profile: str = typer.Option(
+        "generic",
+        help="Review heuristic profile for --name-groups (default: generic).",
+    ),
+    review_rules: Path | None = typer.Option(
+        None,
+        help="Optional JSON file to customize generic split-review heuristics.",
+    ),
+    review_policy: str | None = typer.Option(
+        None,
+        help="Advanced: Python review policy plugin in 'module.path:attr' form.",
+    ),
     max_component_size: int = typer.Option(100, help="Max component size before splitting."),
 ) -> None:
     """Deduplicate text labels from files, globs, or stdin."""
@@ -972,6 +1008,9 @@ def dedupe(
         max_component_size=max_component_size,
         name_groups=name_groups,
         naming_model=naming_model,
+        review_profile=review_profile,
+        review_rules=review_rules,
+        review_policy=review_policy,
         quiet=quiet,
     )
     result = dedupe_outcome.result
@@ -1010,6 +1049,18 @@ def corpus(
     stop_words: str | None = typer.Option(None, help="Comma-separated stop words."),
     name_groups: bool = typer.Option(False, "--name-groups", help="Name groups with LLM."),
     naming_model: str = typer.Option("gpt-4o-mini", help="Model for group naming."),
+    review_profile: str = typer.Option(
+        "generic",
+        help="Review heuristic profile for --name-groups (default: generic).",
+    ),
+    review_rules: Path | None = typer.Option(
+        None,
+        help="Optional JSON file to customize generic split-review heuristics.",
+    ),
+    review_policy: str | None = typer.Option(
+        None,
+        help="Advanced: Python review policy plugin in 'module.path:attr' form.",
+    ),
     max_component_size: int = typer.Option(100, help="Max component size before splitting."),
 ) -> None:
     """Extract a field across a corpus and output a dedup mapping."""
@@ -1031,6 +1082,9 @@ def corpus(
         max_component_size=max_component_size,
         name_groups=name_groups,
         naming_model=naming_model,
+        review_profile=review_profile,
+        review_rules=review_rules,
+        review_policy=review_policy,
         quiet=quiet,
     )
     result = dedupe_outcome.result

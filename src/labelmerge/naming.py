@@ -1,21 +1,46 @@
 from __future__ import annotations
 
+import importlib
 import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 import openai
 
-from labelmerge.models import Group, Member
+from labelmerge.models import Group
 
-_ANTONYM_PAIRS: tuple[tuple[str, str], ...] = (
-    ("left", "right"),
-    ("upper", "lower"),
-    ("pre", "post"),
-    ("anterior", "posterior"),
-    ("proximal", "distal"),
-    ("systolic", "diastolic"),
-)
+
+@dataclass(frozen=True)
+class ReviewRules:
+    """Configurable heuristics for split-review suspicion detection."""
+
+    antonym_pairs: tuple[tuple[str, str], ...] = (
+        ("left", "right"),
+        ("upper", "lower"),
+        ("pre", "post"),
+        ("anterior", "posterior"),
+        ("proximal", "distal"),
+        ("systolic", "diastolic"),
+    )
+    regex_conflicts: tuple[tuple[str, str], ...] = ((r"\bpt\b", r"\bptt\b"),)
+    enable_subtype_suffix_check: bool = True
+    enable_parenthetical_qualifier_check: bool = True
+    canonical_style_hint: str = "concise, stable, and lowercase when possible"
+
+
+@runtime_checkable
+class ReviewPolicy(Protocol):
+    """Extension point for LLM group review behavior."""
+
+    def is_suspicious_group(self, group: Group) -> bool:
+        """Return True when the group should be reviewed for possible splits."""
+        ...
+
+    def build_batch_prompt(self, batch: list[tuple[int, Group]], *, allow_split: bool) -> str:
+        """Build the LLM prompt for a review/naming batch."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -31,12 +56,32 @@ class _ReviewDecision:
     subgroups: tuple[_ReviewedSubgroup, ...] = ()
 
 
+class GenericReviewPolicy:
+    """Default review policy with configurable generic heuristics."""
+
+    def __init__(self, rules: ReviewRules | None = None) -> None:
+        self.rules = rules or ReviewRules()
+
+    def is_suspicious_group(self, group: Group) -> bool:
+        return _is_suspicious_group(group, rules=self.rules)
+
+    def build_batch_prompt(self, batch: list[tuple[int, Group]], *, allow_split: bool) -> str:
+        return _build_batch_prompt(
+            batch,
+            allow_split=allow_split,
+            canonical_style_hint=self.rules.canonical_style_hint,
+        )
+
+
 async def name_groups(
     groups: list[Group],
     model: str = "gpt-4o-mini",
     temperature: float = 0.0,
     api_key: str | None = None,
     batch_size: int = 8,
+    review_profile: str = "generic",
+    review_rules_path: str | Path | None = None,
+    review_policy: str | None = None,
 ) -> list[Group]:
     """Name groups with LLM review that can also split bad merges.
 
@@ -48,6 +93,11 @@ async def name_groups(
         return []
 
     client = openai.AsyncOpenAI(api_key=api_key)
+    policy = load_review_policy(
+        review_profile=review_profile,
+        review_rules_path=review_rules_path,
+        review_policy=review_policy,
+    )
     decisions: dict[int, _ReviewDecision] = {}
 
     suspicious_batches: list[list[tuple[int, Group]]] = []
@@ -56,7 +106,7 @@ async def name_groups(
     current_safe: list[tuple[int, Group]] = []
 
     for idx, group in enumerate(groups):
-        bucket = current_suspicious if _is_suspicious_group(group) else current_safe
+        bucket = current_suspicious if policy.is_suspicious_group(group) else current_safe
         bucket.append((idx, group))
         if len(bucket) >= batch_size:
             if bucket is current_suspicious:
@@ -79,6 +129,7 @@ async def name_groups(
                 model=model,
                 temperature=temperature,
                 allow_split=False,
+                policy=policy,
             )
         )
 
@@ -90,6 +141,7 @@ async def name_groups(
                 model=model,
                 temperature=temperature,
                 allow_split=True,
+                policy=policy,
             )
         )
 
@@ -108,45 +160,148 @@ def _default_canonical(group: Group) -> str:
     return group.canonical or group.members[0].text
 
 
+def load_review_rules(path: str | Path | None) -> ReviewRules:
+    """Load optional heuristic overrides from a JSON file."""
+    if path is None:
+        return ReviewRules()
+
+    with open(path) as f:
+        raw = json.load(f)
+    if not isinstance(raw, dict):
+        raise ValueError("Review rules file must be a JSON object")
+
+    defaults = ReviewRules()
+
+    antonym_pairs = defaults.antonym_pairs
+    if "antonym_pairs" in raw:
+        value = raw["antonym_pairs"]
+        if not isinstance(value, list):
+            raise ValueError("review rules: antonym_pairs must be a list")
+        parsed_pairs: list[tuple[str, str]] = []
+        for item in value:
+            if (
+                not isinstance(item, list | tuple)
+                or len(item) != 2
+                or not all(isinstance(x, str) and x.strip() for x in item)
+            ):
+                raise ValueError("review rules: each antonym_pairs item must be [str, str]")
+            parsed_pairs.append((item[0].strip().lower(), item[1].strip().lower()))
+        antonym_pairs = tuple(parsed_pairs)
+
+    regex_conflicts = defaults.regex_conflicts
+    if "regex_conflicts" in raw:
+        value = raw["regex_conflicts"]
+        if not isinstance(value, list):
+            raise ValueError("review rules: regex_conflicts must be a list")
+        parsed_conflicts: list[tuple[str, str]] = []
+        for item in value:
+            if (
+                not isinstance(item, list | tuple)
+                or len(item) != 2
+                or not all(isinstance(x, str) and x for x in item)
+            ):
+                raise ValueError("review rules: each regex_conflicts item must be [pattern_a, pattern_b]")
+            parsed_conflicts.append((item[0], item[1]))
+        regex_conflicts = tuple(parsed_conflicts)
+
+    subtype = raw.get("enable_subtype_suffix_check", defaults.enable_subtype_suffix_check)
+    qualifiers = raw.get(
+        "enable_parenthetical_qualifier_check",
+        defaults.enable_parenthetical_qualifier_check,
+    )
+    canonical_style_hint = raw.get("canonical_style_hint", defaults.canonical_style_hint)
+
+    if not isinstance(subtype, bool):
+        raise ValueError("review rules: enable_subtype_suffix_check must be boolean")
+    if not isinstance(qualifiers, bool):
+        raise ValueError("review rules: enable_parenthetical_qualifier_check must be boolean")
+    if not isinstance(canonical_style_hint, str) or not canonical_style_hint.strip():
+        raise ValueError("review rules: canonical_style_hint must be a non-empty string")
+
+    return ReviewRules(
+        antonym_pairs=antonym_pairs,
+        regex_conflicts=regex_conflicts,
+        enable_subtype_suffix_check=subtype,
+        enable_parenthetical_qualifier_check=qualifiers,
+        canonical_style_hint=canonical_style_hint.strip(),
+    )
+
+
+def load_review_policy(
+    *,
+    review_profile: str = "generic",
+    review_rules_path: str | Path | None = None,
+    review_policy: str | None = None,
+) -> ReviewPolicy:
+    """Load a review policy (built-in generic by default).
+
+    `review_policy` supports `module.submodule:attr`, where `attr` is either:
+    - a policy instance implementing `ReviewPolicy`, or
+    - a zero-arg callable returning one.
+    """
+    if review_policy:
+        module_name, sep, attr_name = review_policy.partition(":")
+        if not sep or not module_name or not attr_name:
+            raise ValueError("review policy must be in 'module.path:attr' form")
+        module = importlib.import_module(module_name)
+        attr = getattr(module, attr_name)
+        policy_obj = attr() if callable(attr) else attr
+        if not isinstance(policy_obj, ReviewPolicy):
+            raise ValueError("loaded review policy does not implement ReviewPolicy")
+        return policy_obj
+
+    if review_profile != "generic":
+        raise ValueError(
+            f"Unknown review profile: {review_profile!r}. "
+            "Use 'generic' or provide --review-policy module:attr."
+        )
+
+    return GenericReviewPolicy(load_review_rules(review_rules_path))
+
+
 def _normalize_text_for_heuristics(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
 
-def _is_suspicious_group(group: Group) -> bool:
+def _is_suspicious_group(group: Group, *, rules: ReviewRules | None = None) -> bool:
+    config = rules or ReviewRules()
     if group.size <= 1:
         return False
     texts = [m.text for m in group.members]
     normalized = [_normalize_text_for_heuristics(t) for t in texts]
     token_sets = [set(t.split()) for t in normalized if t]
 
-    for left, right in _ANTONYM_PAIRS:
+    for left, right in config.antonym_pairs:
         seen_left = any(left in toks for toks in token_sets)
         seen_right = any(right in toks for toks in token_sets)
         if seen_left and seen_right:
             return True
 
     joined = " ".join(normalized)
-    if re.search(r"\bpt\b", joined) and re.search(r"\bptt\b", joined):
-        return True
+    for pat_a, pat_b in config.regex_conflicts:
+        if re.search(pat_a, joined) and re.search(pat_b, joined):
+            return True
 
     # Flag chains like NR2A/NR2B or receptor subtype suffixes sharing the same base.
-    suffix_variants: dict[str, set[str]] = {}
-    for text in normalized:
-        for match in re.finditer(r"\b([a-z]+\d+)([a-z])\b", text):
-            base, suffix = match.groups()
-            suffix_variants.setdefault(base, set()).add(suffix)
-    if any(len(suffixes) > 1 for suffixes in suffix_variants.values()):
-        return True
+    if config.enable_subtype_suffix_check:
+        suffix_variants: dict[str, set[str]] = {}
+        for text in normalized:
+            for match in re.finditer(r"\b([a-z]+\d+)([a-z])\b", text):
+                base, suffix = match.groups()
+                suffix_variants.setdefault(base, set()).add(suffix)
+        if any(len(suffixes) > 1 for suffixes in suffix_variants.values()):
+            return True
 
     # Distinct parenthetical qualifiers inside a small group are often false merges.
-    qualifiers = {
-        q.strip().lower()
-        for raw in texts
-        for q in re.findall(r"\(([^)]+)\)", raw)
-        if q.strip()
-    }
-    if len(qualifiers) >= 2:
-        return True
+    if config.enable_parenthetical_qualifier_check:
+        qualifiers = {
+            q.strip().lower()
+            for raw in texts
+            for q in re.findall(r"\(([^)]+)\)", raw)
+            if q.strip()
+        }
+        if len(qualifiers) >= 2:
+            return True
 
     return False
 
@@ -158,8 +313,9 @@ async def _request_batch_decisions(
     model: str,
     temperature: float,
     allow_split: bool,
+    policy: ReviewPolicy,
 ) -> dict[int, _ReviewDecision]:
-    prompt = _build_batch_prompt(batch, allow_split=allow_split)
+    prompt = policy.build_batch_prompt(batch, allow_split=allow_split)
     response = await client.chat.completions.create(
         model=model,
         temperature=temperature,
@@ -171,7 +327,12 @@ async def _request_batch_decisions(
     return _parse_batch_response(content, batch, allow_split=allow_split)
 
 
-def _build_batch_prompt(batch: list[tuple[int, Group]], *, allow_split: bool) -> str:
+def _build_batch_prompt(
+    batch: list[tuple[int, Group]],
+    *,
+    allow_split: bool,
+    canonical_style_hint: str = "concise, stable, and lowercase when possible",
+) -> str:
     action_instructions = (
         "For each group, decide whether to keep as one concept (action=name) "
         "or split into distinct concepts (action=split)."
@@ -194,7 +355,7 @@ def _build_batch_prompt(batch: list[tuple[int, Group]], *, allow_split: bool) ->
         action_instructions,
         "Return ONLY valid JSON (no markdown, no explanations).",
         "Use exact member text strings in split subgroups.",
-        "Canonical labels should be concise, stable, and lowercase when possible.",
+        f"Canonical labels should be {canonical_style_hint}.",
         f"JSON schema shape: {schema_text}",
         "",
         "Groups:",

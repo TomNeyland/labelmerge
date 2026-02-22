@@ -107,10 +107,23 @@ class LabelMerge:
         return await self.dedupe(texts)
 
     async def name_groups(
-        self, result: Result, model: str = "gpt-4o-mini", temperature: float = 0.0
+        self,
+        result: Result,
+        model: str = "gpt-4o-mini",
+        temperature: float = 0.0,
+        review_profile: str = "generic",
+        review_rules_path: str | Path | None = None,
+        review_policy: str | None = None,
     ) -> Result:
         """Name all groups in a result using an LLM."""
-        named = await name_groups(result.groups, model=model, temperature=temperature)
+        named = await name_groups(
+            result.groups,
+            model=model,
+            temperature=temperature,
+            review_profile=review_profile,
+            review_rules_path=review_rules_path,
+            review_policy=review_policy,
+        )
         # Review may split groups; rebuild group IDs and summary counts.
         reindexed_groups = [
             group.model_copy(update={"group_id": group_id}) for group_id, group in enumerate(named)
